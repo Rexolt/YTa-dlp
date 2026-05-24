@@ -89,11 +89,13 @@ jobs:
           depend = libsqlite3
           EOF
               
-              # Compress to .pkg.tar.zst standard
+              # Compress to .pkg.tar.zst standard and also copy to .pacman
               cd pkg
               tar -c --zstd -f ../yta-dlp-0.1.0-1-x86_64.pkg.tar.zst .PKGINFO usr/
+              cp ../yta-dlp-0.1.0-1-x86_64.pkg.tar.zst ../yta-dlp-0.1.0-1-x86_64.pacman
               cd ..
               mv yta-dlp-0.1.0-1-x86_64.pkg.tar.zst "$GITHUB_WORKSPACE/$ARCH_DIR/"
+              mv yta-dlp-0.1.0-1-x86_64.pacman "$GITHUB_WORKSPACE/$ARCH_DIR/"
               echo "✓ Arch pacman package successfully compiled!"
           else
               echo "✗ Could not locate .deb package to generate pacman package"
@@ -108,3 +110,4 @@ jobs:
         with:
           files: |
             src-tauri/target/release/bundle/pacman/*.pkg.tar.zst
+            src-tauri/target/release/bundle/pacman/*.pacman
