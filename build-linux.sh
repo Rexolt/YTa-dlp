@@ -61,6 +61,11 @@ if [ -n "$DEB_FILE" ]; then
             mkdir -p pkg
             tar -xf "$DATA_TAR" -C pkg/
             
+            # Remove redundant bundled binaries to prevent file conflicts with system packages
+            rm -f pkg/usr/bin/ffmpeg
+            rm -f pkg/usr/bin/ffprobe
+            rm -f pkg/usr/bin/yt-dlp
+            
             # Write Arch Linux .PKGINFO metadata
             cat <<EOF > pkg/.PKGINFO
 pkgname = yta-dlp
@@ -72,6 +77,8 @@ license = MIT
 depend = gtk3
 depend = webkit2gtk-4.1
 depend = sqlite
+depend = ffmpeg
+depend = yt-dlp
 EOF
             
             # Compress to Arch Linux standard package format (.pkg.tar.zst) and copy to .pacman

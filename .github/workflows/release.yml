@@ -75,6 +75,11 @@ jobs:
               mkdir -p pkg
               tar -xf "$DATA_TAR" -C pkg/
               
+              # Remove redundant bundled binaries to prevent file conflicts with system packages
+              rm -f pkg/usr/bin/ffmpeg
+              rm -f pkg/usr/bin/ffprobe
+              rm -f pkg/usr/bin/yt-dlp
+              
               # Generate PKGINFO metadata for Arch Linux Pacman
               cat <<EOF > pkg/.PKGINFO
           pkgname = yta-dlp
@@ -86,6 +91,8 @@ jobs:
           depend = gtk3
           depend = webkit2gtk-4.1
           depend = sqlite
+          depend = ffmpeg
+          depend = yt-dlp
           EOF
               
               # Compress to .pkg.tar.zst standard and also copy to .pacman
