@@ -75,14 +75,16 @@ depend = webkit2gtk-4.1
 depend = libsqlite3
 EOF
             
-            # Compress to Arch Linux standard package format (.pkg.tar.zst)
+            # Compress to Arch Linux standard package format (.pkg.tar.zst) and copy to .pacman
             (
                 cd pkg
                 tar -c --zstd -f ../yta-dlp-0.1.0-1-x86_64.pkg.tar.zst .PKGINFO usr/
+                cp ../yta-dlp-0.1.0-1-x86_64.pkg.tar.zst ../yta-dlp-0.1.0-1-x86_64.pacman
             )
             
             mv yta-dlp-0.1.0-1-x86_64.pkg.tar.zst "$PROJECT_ROOT/$ARCH_DIR/"
-            echo -e "${GREEN}✓ Arch Linux Pacman package (.pkg.tar.zst) created!${NC}"
+            mv yta-dlp-0.1.0-1-x86_64.pacman "$PROJECT_ROOT/$ARCH_DIR/"
+            echo -e "${GREEN}✓ Arch Linux Pacman package (.pkg.tar.zst & .pacman) created!${NC}"
         else
             echo -e "${RED}✗ Failed to parse deb package structure${NC}"
         fi
@@ -131,6 +133,11 @@ if [ -d "$ARCH_DIR" ]; then
         echo -e "${GREEN}✓ Arch Linux Pacman package (.pkg.tar.zst):${NC}"
         echo -e "  $(realpath "$PACMAN_FILE")"
         FOUND_ANY=true
+    fi
+    PACMAN_EXT_FILE=$(find "$ARCH_DIR" -name "*.pacman" | head -n 1 || true)
+    if [ -n "$PACMAN_EXT_FILE" ]; then
+        echo -e "${GREEN}✓ Arch Linux direct package (.pacman):${NC}"
+        echo -e "  $(realpath "$PACMAN_EXT_FILE")"
     fi
 fi
 
