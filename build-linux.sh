@@ -38,14 +38,18 @@ echo -e "\n${CYAN}[4/5] Building Svelte frontend & Tauri Rust bundle...${NC}"
 # If they fail, we log a warning but continue so that the built DEB and Pacman packages are preserved.
 pnpm tauri build --bundles deb,appimage || echo -e "${YELLOW}⚠ AppImage packaging failed (usually because 'libfuse2' is missing on host). Continuing with DEB and Pacman packaging...${NC}"
 
-# 4.5. Build Arch Linux pacman package (.pkg.tar.zst) from the built .deb package
+# 4.5. Build Arch Linux pacman package (.pkg.tar.zst) and Fedora RPM package (.rpm) from the built .deb package
 DEB_DIR="src-tauri/target/release/bundle/deb"
 ARCH_DIR="src-tauri/target/release/bundle/pacman"
+RPM_DIR="src-tauri/target/release/bundle/rpm"
+
+# Clean up existing RPM and Pacman directories to prevent stale or conflicted packages
+rm -rf "$ARCH_DIR"
+rm -rf "$RPM_DIR"
 
 DEB_FILE=$(find "$DEB_DIR" -name "*.deb" | head -n 1 || true)
 if [ -n "$DEB_FILE" ]; then
     echo -e "\n${CYAN}Building Arch Linux Pacman package (.pkg.tar.zst) from .deb...${NC}"
-    rm -rf "$ARCH_DIR"
     mkdir -p "$ARCH_DIR"
     
     TEMP_PKG=$(mktemp -d)
@@ -91,6 +95,61 @@ EOF
             mv yta-dlp-0.1.0-1-x86_64.pkg.tar.zst "$PROJECT_ROOT/$ARCH_DIR/"
             mv yta-dlp-0.1.0-1-x86_64.pacman "$PROJECT_ROOT/$ARCH_DIR/"
             echo -e "${GREEN}✓ Arch Linux Pacman package (.pkg.tar.zst & .pacman) created!${NC}"
+            
+            # Build Fedora RPM package if rpmbuild is available
+            if command -v rpmbuild >/dev/null 2>&1; then
+                echo -e "\n${CYAN}Building Fedora RPM package (.rpm) from .deb...${NC}"
+                mkdir -p "$PROJECT_ROOT/$RPM_DIR"
+                
+                RPM_BUILD_DIR=$(mktemp -d)
+                mkdir -p "$RPM_BUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+                
+                # Copy the extracted files (without sidecars) to SOURCES/pkg
+                cp -r pkg "$RPM_BUILD_DIR/SOURCES/"
+                
+                # Write RPM spec file
+                cat <<EOF > "$RPM_BUILD_DIR/SPECS/yta-dlp.spec"
+Name:           yta-dlp
+Version:        0.1.0
+Release:        1%{?dist}
+Summary:        premium downloader · powered by yt-dlp
+License:        MIT
+URL:            https://github.com/Rexolt/YTa-dlp
+Requires:       gtk3
+Requires:       webkit2gtk4.1
+Requires:       sqlite
+Requires:       ffmpeg
+Requires:       yt-dlp
+
+%description
+premium downloader · powered by yt-dlp
+
+%install
+mkdir -p %{buildroot}
+cp -r %{_sourcedir}/pkg/* %{buildroot}/
+
+%files
+/usr/bin/yta-dlp
+/usr/share/applications/YTa-dlp.desktop
+/usr/share/icons/hicolor/*/apps/yta-dlp.png
+EOF
+
+                # Run rpmbuild
+                rpmbuild --define "_topdir $RPM_BUILD_DIR" -bb "$RPM_BUILD_DIR/SPECS/yta-dlp.spec"
+                
+                # Copy the generated RPM to target directory
+                GENERATED_RPM=$(find "$RPM_BUILD_DIR/RPMS" -name "*.rpm" | head -n 1 || true)
+                if [ -n "$GENERATED_RPM" ]; then
+                    cp "$GENERATED_RPM" "$PROJECT_ROOT/$RPM_DIR/yta-dlp-0.1.0-1.x86_64.rpm"
+                    echo -e "${GREEN}✓ Fedora RPM package (.rpm) created!${NC}"
+                else
+                    echo -e "${RED}✗ Failed to locate generated RPM package${NC}"
+                fi
+                
+                rm -rf "$RPM_BUILD_DIR"
+            else
+                echo -e "\n${YELLOW}⚠ 'rpmbuild' not found. Skipping Fedora RPM package creation. Install 'rpm-build' to compile RPMs locally.${NC}"
+            fi
         else
             echo -e "${RED}✗ Failed to parse deb package structure${NC}"
         fi
