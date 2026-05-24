@@ -1,0 +1,110 @@
+name: Build & Release YTa-dlp
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file libssl-dev pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libsqlite3-dev libayatana-appindicator3-dev librsvg2-dev rpm zstd
+
+      - name: Install Svelte dependencies
+        run: pnpm install
+
+      - name: Fetch sidecar binaries
+        run: pnpm run binaries:fetch
+
+      - name: Build Svelte production assets
+        run: pnpm run build
+
+      - name: Build Tauri and create GitHub Release
+        id: tauri-build
+        uses: tauri-apps/tauri-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'YTa-dlp v__VERSION__'
+          releaseBody: 'Premium downloader powered by yt-dlp. Select the package that fits your Linux distribution.'
+          releaseDraft: false
+          prerelease: false
+
+      - name: Build Arch Linux Pacman package (.pkg.tar.zst)
+        run: |
+          DEB_DIR="src-tauri/target/release/bundle/deb"
+          ARCH_DIR="src-tauri/target/release/bundle/pacman"
+          DEB_FILE=$(find "$DEB_DIR" -name "*.deb" | head -n 1 || true)
+          if [ -n "$DEB_FILE" ]; then
+              mkdir -p "$ARCH_DIR"
+              TEMP_PKG=$(mktemp -d)
+              cp "$DEB_FILE" "$TEMP_PKG/"
+              cd "$TEMP_PKG"
+              
+              # Extract the deb package contents
+              ar x *.deb
+              DATA_TAR=$(find . -name "data.tar.*" | head -n 1)
+              mkdir -p pkg
+              tar -xf "$DATA_TAR" -C pkg/
+              
+              # Generate PKGINFO metadata for Arch Linux Pacman
+              cat <<EOF > pkg/.PKGINFO
+          pkgname = yta-dlp
+          pkgver = 0.1.0
+          pkgrel = 1
+          pkgdesc = premium downloader · powered by yt-dlp
+          url = https://github.com/Rexolt/YTa-dlp
+          arch = x86_64
+          license = MIT
+          depend = gtk3
+          depend = webkit2gtk-4.1
+          depend = libsqlite3
+          EOF
+              
+              # Compress to .pkg.tar.zst standard
+              cd pkg
+              tar -c --zstd -f ../yta-dlp-0.1.0-1-x86_64.pkg.tar.zst .PKGINFO usr/
+              cd ..
+              mv yta-dlp-0.1.0-1-x86_64.pkg.tar.zst "$GITHUB_WORKSPACE/$ARCH_DIR/"
+              echo "✓ Arch pacman package successfully compiled!"
+          else
+              echo "✗ Could not locate .deb package to generate pacman package"
+              exit 1
+          fi
+
+      - name: Upload Arch Linux Pacman package to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            src-tauri/target/release/bundle/pacman/*.pkg.tar.zst
