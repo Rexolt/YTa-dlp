@@ -107,6 +107,8 @@ pub fn build_args(opts: &DownloadOptions) -> Vec<String> {
     // Metadata
     if opts.metadata.embed_thumbnail {
         a.push("--embed-thumbnail".into());
+        a.push("--convert-thumbnails".into());
+        a.push("jpg".into());
     }
     if opts.metadata.embed_metadata {
         a.push("--embed-metadata".into());
