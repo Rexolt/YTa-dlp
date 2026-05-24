@@ -67,7 +67,7 @@ export interface ProbeResult {
 export interface ToolStatus {
   name: string;
   available: boolean;
-  source: 'packaged' | 'devSidecar' | 'systemPath' | 'missing';
+  source: 'userInstalled' | 'packaged' | 'devSidecar' | 'systemPath' | 'missing';
   path: string | null;
   version: string | null;
 }

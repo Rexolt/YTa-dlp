@@ -205,13 +205,18 @@ pub async fn probe_url(url: String) -> AppResult<ProbeResult> {
     if !yt_dlp.is_present() {
         return Err(AppError::YtDlpNotFound);
     }
-    let output = Command::new(&yt_dlp.path)
-        .args(["-J", "--no-warnings", "--no-playlist", "--skip-download", &url])
+    
+    // Set a 20-second timeout to prevent indefinite hangs, and use --force-ipv4 to bypass IPv6 handshake stalls
+    let future = Command::new(&yt_dlp.path)
+        .args(["-J", "--force-ipv4", "--no-warnings", "--no-playlist", "--skip-download", &url])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .output()
+        .output();
+        
+    let output = tokio::time::timeout(std::time::Duration::from_secs(20), future)
         .await
+        .map_err(|_| AppError::Other("Probing timed out. Please check your internet connection or update yt-dlp.".to_string()))?
         .map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => AppError::YtDlpNotFound,
             _ => AppError::Io(e),
@@ -429,6 +434,7 @@ async fn probe_tool_version(
 
 fn source_to_str(s: BinarySource) -> &'static str {
     match s {
+        BinarySource::UserInstalled => "userInstalled",
         BinarySource::Packaged => "packaged",
         BinarySource::DevSidecar => "devSidecar",
         BinarySource::SystemPath => "systemPath",
@@ -529,19 +535,63 @@ pub async fn reveal_in_file_manager(path: String) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn update_ytdlp() -> AppResult<UpdateResult> {
-    let yt_dlp = bin::resolve("yt-dlp");
-    if !yt_dlp.is_present() {
-        return Err(AppError::YtDlpNotFound);
+    // 1. Get the user's home binary directory
+    let Some(bin_dir) = bin::user_bin_dir() else {
+        return Err(AppError::Other("Could not resolve user home directory".to_string()));
+    };
+    
+    // Create it if it doesn't exist
+    if !bin_dir.exists() {
+        std::fs::create_dir_all(&bin_dir).map_err(AppError::Io)?;
     }
-    let out = Command::new(&yt_dlp.path)
-        .args(["-U", "--no-colors"])
+    
+    // 2. Select URL based on target platform
+    let url = if cfg!(windows) {
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+    } else if cfg!(target_os = "macos") {
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
+    } else {
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+    };
+    
+    let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
+    let target_path = bin_dir.join(format!("yt-dlp{}", exe_suffix));
+    
+    // 3. Download the executable using reqwest
+    let response = reqwest::get(url)
+        .await
+        .map_err(|e| AppError::Other(format!("Failed to download yt-dlp: {e}")))?;
+        
+    if !response.status().is_success() {
+        return Err(AppError::Other(format!("GitHub returned HTTP {}", response.status())));
+    }
+    
+    let bytes = response.bytes()
+        .await
+        .map_err(|e| AppError::Other(format!("Failed to read yt-dlp bytes: {e}")))?;
+        
+    std::fs::write(&target_path, &bytes).map_err(AppError::Io)?;
+    
+    // 4. On Unix, set execute permissions (chmod +x)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&target_path).map_err(AppError::Io)?.permissions();
+        perms.set_mode(0o755); // rwxr-xr-x
+        std::fs::set_permissions(&target_path, perms).map_err(AppError::Io)?;
+    }
+    
+    // 5. Get version of the downloaded executable to show success
+    let out = Command::new(&target_path)
+        .arg("--version")
         .output()
         .await
         .map_err(AppError::Io)?;
-    let combined = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    Ok(UpdateResult { success: out.status.success(), output: combined })
+        
+    let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    
+    Ok(UpdateResult {
+        success: true,
+        output: format!("Successfully downloaded and updated yt-dlp to version {} in user directory: {:?}", version, target_path),
+    })
 }

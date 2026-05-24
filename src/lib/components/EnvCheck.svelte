@@ -47,6 +47,7 @@
 
   function sourceBadge(s: ToolStatus['source']) {
     switch (s) {
+      case 'userInstalled': return { label: 'updated',   cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' };
       case 'packaged':   return { label: 'bundled',  cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' };
       case 'devSidecar': return { label: 'sidecar',  cls: 'bg-primary/15 text-primary border-primary/30' };
       case 'systemPath': return { label: 'system',   cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' };

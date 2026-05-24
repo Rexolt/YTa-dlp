@@ -7,6 +7,8 @@ pub const TARGET_TRIPLE: &str = env!("TARGET_TRIPLE");
 
 #[derive(Debug, Clone, Copy)]
 pub enum BinarySource {
+    /// Found in user's app data directory (downloaded update).
+    UserInstalled,
     /// Found next to the app exe (packaged release).
     Packaged,
     /// Found in `src-tauri/binaries/<name>-<triple>` (dev mode).
@@ -36,10 +38,35 @@ static EXE_DIR: Lazy<Option<PathBuf>> = Lazy::new(|| {
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
 });
 
+/// Get the user-specific binaries directory (cross-platform App Data).
+pub fn user_bin_dir() -> Option<PathBuf> {
+    if cfg!(windows) {
+        std::env::var_os("APPDATA")
+            .map(PathBuf::from)
+            .map(|p| p.join("dev.rexolt.ytadlp").join("bin"))
+    } else if cfg!(target_os = "macos") {
+        std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .map(|p| p.join("Library").join("Application Support").join("dev.rexolt.ytadlp").join("bin"))
+    } else {
+        std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .map(|p| p.join(".local").join("share").join("dev.rexolt.ytadlp").join("bin"))
+    }
+}
+
 /// Resolve a sidecar binary by canonical name (e.g. "yt-dlp", "ffmpeg").
-/// Order: packaged (next to exe) → dev sidecar (triple suffix) → system PATH.
+/// Order: user-installed (app data) → packaged (next to exe) → dev sidecar (triple suffix) → system PATH.
 pub fn resolve(name: &'static str) -> ResolvedBinary {
     let exe_name = exe_filename(name);
+
+    // 0. User Installed: in the user's home app data directory
+    if let Some(dir) = user_bin_dir() {
+        let p = dir.join(&exe_name);
+        if p.is_file() {
+            return ResolvedBinary { name, path: p, source: BinarySource::UserInstalled };
+        }
+    }
 
     // 1. Packaged: next to the current exe.
     if let Some(dir) = EXE_DIR.as_ref() {
