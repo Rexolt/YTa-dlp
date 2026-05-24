@@ -64,8 +64,7 @@ if [ -n "$DEB_FILE" ]; then
             # Write Arch Linux .PKGINFO metadata
             cat <<EOF > pkg/.PKGINFO
 pkgname = yta-dlp
-pkgver = 0.1.0
-pkgrel = 1
+pkgver = 0.1.0-1
 pkgdesc = premium downloader · powered by yt-dlp
 url = https://github.com/Rexolt/YTa-dlp
 arch = x86_64
