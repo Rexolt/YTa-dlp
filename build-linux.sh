@@ -34,7 +34,9 @@ pnpm run binaries:fetch
 
 # 4. Compile Svelte & Tauri Application
 echo -e "\n${CYAN}[4/5] Building Svelte frontend & Tauri Rust bundle...${NC}"
-pnpm tauri build --bundles deb,appimage
+# Some bundling steps like AppImage require FUSE (libfuse2) on the host to execute linuxdeploy.
+# If they fail, we log a warning but continue so that the built DEB and Pacman packages are preserved.
+pnpm tauri build --bundles deb,appimage || echo -e "${YELLOW}⚠ AppImage packaging failed (usually because 'libfuse2' is missing on host). Continuing with DEB and Pacman packaging...${NC}"
 
 # 4.5. Build Arch Linux pacman package (.pkg.tar.zst) from the built .deb package
 DEB_DIR="src-tauri/target/release/bundle/deb"
