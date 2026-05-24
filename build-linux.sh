@@ -13,8 +13,22 @@ NC='\033[0m' # No Color
 
 PROJECT_ROOT=$(pwd)
 
+# Read and increment local build number
+BUILD_NUM_FILE=".build_number"
+if [ -f "$BUILD_NUM_FILE" ]; then
+    BUILD_NUM=$(cat "$BUILD_NUM_FILE")
+    BUILD_NUM=$((BUILD_NUM + 1))
+else
+    BUILD_NUM=1
+fi
+echo "$BUILD_NUM" > "$BUILD_NUM_FILE"
+
+# Parse application version from package.json
+VERSION=$(node -p "require('./package.json').version")
+
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${BLUE}          YTa-dlp Linux Production Builder          ${NC}"
+echo -e "${BLUE}  Version: ${VERSION}  |  Build Number: ${BUILD_NUM}${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 # 1. System dependency helper reminder (Ubuntu/Debian)
@@ -73,7 +87,7 @@ if [ -n "$DEB_FILE" ]; then
             # Write Arch Linux .PKGINFO metadata
             cat <<EOF > pkg/.PKGINFO
 pkgname = yta-dlp
-pkgver = 0.1.0-1
+pkgver = ${VERSION}-${BUILD_NUM}
 pkgdesc = premium downloader · powered by yt-dlp
 url = https://github.com/Rexolt/YTa-dlp
 arch = x86_64
@@ -88,12 +102,12 @@ EOF
             # Compress to Arch Linux standard package format (.pkg.tar.zst) and copy to .pacman
             (
                 cd pkg
-                tar -c --zstd -f ../yta-dlp-0.1.0-1-x86_64.pkg.tar.zst .PKGINFO usr/
-                cp ../yta-dlp-0.1.0-1-x86_64.pkg.tar.zst ../yta-dlp-0.1.0-1-x86_64.pacman
+                tar -c --zstd -f ../yta-dlp-${VERSION}-${BUILD_NUM}-x86_64.pkg.tar.zst .PKGINFO usr/
+                cp ../yta-dlp-${VERSION}-${BUILD_NUM}-x86_64.pkg.tar.zst ../yta-dlp-${VERSION}-${BUILD_NUM}-x86_64.pacman
             )
             
-            mv yta-dlp-0.1.0-1-x86_64.pkg.tar.zst "$PROJECT_ROOT/$ARCH_DIR/"
-            mv yta-dlp-0.1.0-1-x86_64.pacman "$PROJECT_ROOT/$ARCH_DIR/"
+            mv yta-dlp-${VERSION}-${BUILD_NUM}-x86_64.pkg.tar.zst "$PROJECT_ROOT/$ARCH_DIR/"
+            mv yta-dlp-${VERSION}-${BUILD_NUM}-x86_64.pacman "$PROJECT_ROOT/$ARCH_DIR/"
             echo -e "${GREEN}✓ Arch Linux Pacman package (.pkg.tar.zst & .pacman) created!${NC}"
             
             # Build Fedora RPM package if rpmbuild is available
@@ -110,16 +124,17 @@ EOF
                 # Write RPM spec file
                 cat <<EOF > "$RPM_BUILD_DIR/SPECS/yta-dlp.spec"
 Name:           yta-dlp
-Version:        0.1.0
-Release:        1%{?dist}
+Version:        ${VERSION}
+Release:        ${BUILD_NUM}%{?dist}
 Summary:        premium downloader · powered by yt-dlp
 License:        MIT
 URL:            https://github.com/Rexolt/YTa-dlp
 Requires:       gtk3
 Requires:       webkit2gtk4.1
 Requires:       sqlite
-Requires:       ffmpeg
-Requires:       yt-dlp
+Requires:       /usr/bin/ffmpeg
+Requires:       /usr/bin/ffprobe
+Requires:       /usr/bin/yt-dlp
 
 %description
 premium downloader · powered by yt-dlp
@@ -140,7 +155,7 @@ EOF
                 # Copy the generated RPM to target directory
                 GENERATED_RPM=$(find "$RPM_BUILD_DIR/RPMS" -name "*.rpm" | head -n 1 || true)
                 if [ -n "$GENERATED_RPM" ]; then
-                    cp "$GENERATED_RPM" "$PROJECT_ROOT/$RPM_DIR/yta-dlp-0.1.0-1.x86_64.rpm"
+                    cp "$GENERATED_RPM" "$PROJECT_ROOT/$RPM_DIR/yta-dlp-${VERSION}-${BUILD_NUM}.x86_64.rpm"
                     echo -e "${GREEN}✓ Fedora RPM package (.rpm) created!${NC}"
                 else
                     echo -e "${RED}✗ Failed to locate generated RPM package${NC}"
