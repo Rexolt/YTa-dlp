@@ -106,8 +106,8 @@
 <main class="mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-12">
   <header class="mb-12 flex items-center justify-between" in:fade={{ duration: 400 }}>
     <div class="flex items-center gap-2.5">
-      <div class="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-fuchsia-500 shadow-[0_8px_24px_-8px_hsl(var(--primary)/0.7)]">
-        <Download class="h-4 w-4 text-white" />
+      <div class="grid h-9 w-9 place-items-center rounded-xl overflow-hidden shadow-[0_8px_24px_-8px_hsl(var(--primary)/0.7)] border border-primary/20 bg-secondary">
+        <img src="/logo.png" alt="YTa-dlp Logo" class="h-full w-full object-cover" />
       </div>
       <div class="leading-tight">
         <div class="text-sm font-semibold tracking-tight">YTa-dlp</div>
