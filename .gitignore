@@ -1,0 +1,19 @@
+# Node
+node_modules/
+.svelte-kit/
+build/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+
+# Bundled sidecar binaries — fetched by scripts/download-binaries.mjs
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
