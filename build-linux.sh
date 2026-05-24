@@ -71,7 +71,7 @@ arch = x86_64
 license = MIT
 depend = gtk3
 depend = webkit2gtk-4.1
-depend = libsqlite3
+depend = sqlite
 EOF
             
             # Compress to Arch Linux standard package format (.pkg.tar.zst) and copy to .pacman

@@ -85,7 +85,7 @@ jobs:
           license = MIT
           depend = gtk3
           depend = webkit2gtk-4.1
-          depend = libsqlite3
+          depend = sqlite
           EOF
               
               # Compress to .pkg.tar.zst standard and also copy to .pacman
