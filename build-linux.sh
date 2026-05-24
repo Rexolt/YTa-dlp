@@ -34,7 +34,7 @@ pnpm run binaries:fetch
 
 # 4. Compile Svelte & Tauri Application
 echo -e "\n${CYAN}[4/5] Building Svelte frontend & Tauri Rust bundle...${NC}"
-pnpm tauri build
+pnpm tauri build --bundles deb,appimage
 
 # 4.5. Build Arch Linux pacman package (.pkg.tar.zst) from the built .deb package
 DEB_DIR="src-tauri/target/release/bundle/deb"
