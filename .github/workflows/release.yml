@@ -137,19 +137,22 @@ jobs:
               rm -f pkg/usr/bin/yt-dlp
               
               # --- Build Pacman Package ---
-              cat <<EOF > pkg/.PKGINFO
-pkgname = yta-dlp
-pkgver = ${VERSION}-${BUILD_NUM}
-pkgdesc = premium downloader · powered by yt-dlp
-url = https://github.com/Rexolt/YTa-dlp
-arch = x86_64
-license = MIT
-depend = gtk3
-depend = webkit2gtk-4.1
-depend = sqlite
-depend = ffmpeg
-depend = yt-dlp
-EOF
+              # Use grouped echo statements (instead of a heredoc with
+              # left-justified content) so the YAML block scalar parser
+              # doesn't break out of `run: |` on column-0 lines.
+              {
+                echo "pkgname = yta-dlp"
+                echo "pkgver = ${VERSION}-${BUILD_NUM}"
+                echo "pkgdesc = premium downloader · powered by yt-dlp"
+                echo "url = https://github.com/Rexolt/YTa-dlp"
+                echo "arch = x86_64"
+                echo "license = MIT"
+                echo "depend = gtk3"
+                echo "depend = webkit2gtk-4.1"
+                echo "depend = sqlite"
+                echo "depend = ffmpeg"
+                echo "depend = yt-dlp"
+              } > pkg/.PKGINFO
               
               cd pkg
               tar -c --zstd -f ../yta-dlp-${VERSION}-${BUILD_NUM}-x86_64.pkg.tar.zst .PKGINFO usr/
@@ -167,32 +170,34 @@ EOF
               # Copy the extracted files (without sidecars) to SOURCES/pkg
               cp -r pkg "$RPM_BUILD_DIR/SOURCES/"
               
-              cat <<EOF > "$RPM_BUILD_DIR/SPECS/yta-dlp.spec"
-Name:           yta-dlp
-Version:        ${VERSION}
-Release:        ${BUILD_NUM}%{?dist}
-Summary:        premium downloader · powered by yt-dlp
-License:        MIT
-URL:            https://github.com/Rexolt/YTa-dlp
-Requires:       gtk3
-Requires:       webkit2gtk4.1
-Requires:       sqlite
-Requires:       /usr/bin/ffmpeg
-Requires:       /usr/bin/ffprobe
-Requires:       /usr/bin/yt-dlp
-
-%description
-premium downloader · powered by yt-dlp
-
-%install
-mkdir -p %{buildroot}
-cp -r %{_sourcedir}/pkg/* %{buildroot}/
-
-%files
-/usr/bin/yta-dlp
-/usr/share/applications/YTa-dlp.desktop
-/usr/share/icons/hicolor/*/apps/yta-dlp.png
-EOF
+              # Same approach as above: grouped echo lines so the YAML
+              # block scalar isn't broken by column-0 RPM macros (`%...`).
+              {
+                echo "Name:           yta-dlp"
+                echo "Version:        ${VERSION}"
+                echo "Release:        ${BUILD_NUM}%{?dist}"
+                echo "Summary:        premium downloader · powered by yt-dlp"
+                echo "License:        MIT"
+                echo "URL:            https://github.com/Rexolt/YTa-dlp"
+                echo "Requires:       gtk3"
+                echo "Requires:       webkit2gtk4.1"
+                echo "Requires:       sqlite"
+                echo "Requires:       /usr/bin/ffmpeg"
+                echo "Requires:       /usr/bin/ffprobe"
+                echo "Requires:       /usr/bin/yt-dlp"
+                echo ""
+                echo "%description"
+                echo "premium downloader · powered by yt-dlp"
+                echo ""
+                echo "%install"
+                echo "mkdir -p %{buildroot}"
+                echo "cp -r %{_sourcedir}/pkg/* %{buildroot}/"
+                echo ""
+                echo "%files"
+                echo "/usr/bin/yta-dlp"
+                echo "/usr/share/applications/YTa-dlp.desktop"
+                echo "/usr/share/icons/hicolor/*/apps/yta-dlp.png"
+              } > "$RPM_BUILD_DIR/SPECS/yta-dlp.spec"
               
               rpmbuild --define "_topdir $RPM_BUILD_DIR" -bb "$RPM_BUILD_DIR/SPECS/yta-dlp.spec"
               
