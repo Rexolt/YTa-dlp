@@ -50,6 +50,10 @@ pub const EVT_FINISHED: &str = "download://finished";
 #[derive(Debug)]
 pub enum RunOutcome {
     Success,
+    /// The video was downloaded and an output file exists, but yt-dlp
+    /// returned a non-zero exit code (typically from a non-fatal
+    /// post-processing failure like thumbnail embedding on ffmpeg-free).
+    PartialSuccess { warning: String },
     Failed { code: i32, stderr_tail: String },
     Canceled,
 }
@@ -186,14 +190,46 @@ pub async fn run_ytdlp_once(
             match status {
                 Ok(s) if s.success() => RunOutcome::Success,
                 Ok(s) => {
+                    let code = s.code().unwrap_or(-1);
                     let tail = stderr_tail
                         .lock()
                         .ok()
                         .map(|t| t.join("\n"))
                         .unwrap_or_default();
-                    RunOutcome::Failed {
-                        code: s.code().unwrap_or(-1),
-                        stderr_tail: tail,
+
+                    // Give the stdout reader a moment to flush the captured filepath.
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+                    // Check if an output file was captured despite the error —
+                    // this happens when the video downloads fine but a non-fatal
+                    // post-processor (embed-thumbnail on ffmpeg-free) fails.
+                    let has_output = db.get(id).await
+                        .ok()
+                        .flatten()
+                        .and_then(|r| r.output_path)
+                        .map(|p| std::path::Path::new(&p).exists())
+                        .unwrap_or(false);
+
+                    if has_output {
+                        // Post-processing failed but the video exists — partial success.
+                        let warning = tail
+                            .lines()
+                            .rev()
+                            .find(|l| l.contains("ERROR") || l.contains("WARNING"))
+                            .unwrap_or("Post-processing partially failed")
+                            .trim()
+                            .to_string();
+                        tracing::warn!(
+                            id, code,
+                            "yt-dlp exited with code {} but output file exists — treating as partial success: {}",
+                            code, warning
+                        );
+                        RunOutcome::PartialSuccess { warning }
+                    } else {
+                        RunOutcome::Failed {
+                            code,
+                            stderr_tail: tail,
+                        }
                     }
                 }
                 Err(e) => return Err(AppError::Io(e)),

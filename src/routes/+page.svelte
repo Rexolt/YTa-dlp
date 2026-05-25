@@ -7,6 +7,7 @@
   import QueueView from '$lib/components/QueueView.svelte';
   import EnvCheck from '$lib/components/EnvCheck.svelte';
   import HeroCard from '$lib/components/HeroCard.svelte';
+  import HeaderDownloadIndicator from '$lib/components/HeaderDownloadIndicator.svelte';
   import { onMount } from 'svelte';
   import { FolderOpen, Folder } from 'lucide-svelte';
   import { ipc } from '$lib/ipc';
@@ -115,6 +116,7 @@
       </div>
     </div>
     <div class="flex items-center gap-2">
+      <HeaderDownloadIndicator />
       <EnvCheck />
       <div class="flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/40 px-3 py-1 text-[11px] text-muted-foreground">
         <Sparkles class="h-3 w-3 text-primary" /> Beta

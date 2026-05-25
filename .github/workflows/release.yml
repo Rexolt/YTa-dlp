@@ -58,6 +58,50 @@ jobs:
           releaseDraft: false
           prerelease: false
 
+      - name: Strip bundled ffmpeg/yt-dlp from .deb (rely on system packages)
+        run: |
+          DEB_DIR="src-tauri/target/release/bundle/deb"
+          DEB_FILE=$(find "$DEB_DIR" -maxdepth 2 -name "*.deb" | head -n 1 || true)
+          if [ -z "$DEB_FILE" ]; then
+            echo "✗ No .deb found to strip"
+            exit 1
+          fi
+          echo "Repacking: $DEB_FILE"
+
+          DEB_REPACK=$(mktemp -d)
+          cp "$DEB_FILE" "$DEB_REPACK/orig.deb"
+          (
+            cd "$DEB_REPACK"
+            ar x orig.deb
+            mkdir -p extracted
+            DATA_TAR=$(ls data.tar.* | head -n 1)
+            tar -xf "$DATA_TAR" -C extracted/
+            rm -f extracted/usr/bin/ffmpeg \
+                  extracted/usr/bin/ffprobe \
+                  extracted/usr/bin/yt-dlp
+            rm "$DATA_TAR"
+            case "$DATA_TAR" in
+              *.zst) tar --zstd -C extracted -cf data.tar.zst . ;;
+              *.xz)  tar -C extracted -cJf data.tar.xz . ;;
+              *.gz)  tar -C extracted -czf data.tar.gz . ;;
+              *)     tar -C extracted -cf data.tar . ;;
+            esac
+            NEW_DATA=$(ls data.tar.* | head -n 1)
+            CONTROL_TAR=$(ls control.tar.* | head -n 1)
+            ar rc repacked.deb debian-binary "$CONTROL_TAR" "$NEW_DATA"
+          )
+          if [ -f "$DEB_REPACK/repacked.deb" ]; then
+            cp "$DEB_REPACK/repacked.deb" "$DEB_FILE"
+            echo "✓ .deb stripped of bundled ffmpeg/yt-dlp"
+            dpkg -c "$DEB_FILE" | grep -E "usr/bin/(ffmpeg|ffprobe|yt-dlp)" && {
+              echo "✗ Sidecars still present after strip"; exit 1; } || \
+              echo "✓ Verified no bundled sidecars remain in .deb"
+          else
+            echo "✗ Failed to repack .deb"
+            exit 1
+          fi
+          rm -rf "$DEB_REPACK"
+
       - name: Build Arch Linux Pacman & Fedora RPM packages
         run: |
           DEB_DIR="src-tauri/target/release/bundle/deb"
@@ -86,7 +130,8 @@ jobs:
               mkdir -p pkg
               tar -xf "$DATA_TAR" -C pkg/
               
-              # Remove redundant bundled binaries to prevent file conflicts with system packages
+              # Deb is already stripped above, but keep these as a safety net in
+              # case someone re-runs the step out of order.
               rm -f pkg/usr/bin/ffmpeg
               rm -f pkg/usr/bin/ffprobe
               rm -f pkg/usr/bin/yt-dlp

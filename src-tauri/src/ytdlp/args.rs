@@ -37,7 +37,13 @@ pub fn build_args(opts: &DownloadOptions) -> Vec<String> {
     a.push("--progress".into());
     a.push("--progress-template".into());
     a.push(format!("download:{}", PROGRESS_TEMPLATE));
-    a.push("--ignore-errors".into());
+    // `--ignore-errors` is only safe for playlists (keep going past one bad
+    // item). For a single video it silently masks fatal errors and yt-dlp
+    // can exit 0 without producing any file, which surfaces in the UI as
+    // "download succeeded but nothing happened". Default is abort-on-error.
+    if opts.playlist.enabled {
+        a.push("--ignore-errors".into());
+    }
 
     // Output template
     a.push("-P".into());
@@ -106,9 +112,19 @@ pub fn build_args(opts: &DownloadOptions) -> Vec<String> {
 
     // Metadata
     if opts.metadata.embed_thumbnail {
-        a.push("--embed-thumbnail".into());
-        a.push("--convert-thumbnails".into());
-        a.push("jpg".into());
+        // YouTube thumbnails are typically WebP. Fedora's `ffmpeg-free` cannot decode
+        // WebP, which causes yt-dlp to crash with "Error opening output files".
+        // Gracefully skip if the system ffmpeg lacks support.
+        if crate::bin::ffmpeg_has_webp() {
+            a.push("--embed-thumbnail".into());
+            a.push("--convert-thumbnails".into());
+            a.push("jpg".into());
+        } else {
+            tracing::warn!(
+                "Skipping --embed-thumbnail: system ffmpeg cannot decode WebP. \
+                 Install full ffmpeg (e.g. RPM Fusion) to enable thumbnail embedding."
+            );
+        }
     }
     if opts.metadata.embed_metadata {
         a.push("--embed-metadata".into());

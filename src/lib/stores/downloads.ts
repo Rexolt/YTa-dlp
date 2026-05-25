@@ -91,6 +91,21 @@ function createStore() {
       items.set(m);
     },
 
+    /**
+     * Insert/refresh a record from the backend's `queue://queued` event,
+     * fired immediately after enqueue. Without this the UI would only
+     * see the download once the dispatcher picks it up (which feels like
+     * "nothing happened" when clicking Download).
+     */
+    handleQueued(r: DownloadRecord) {
+      items.update((m) => {
+        const cur = m.get(r.id);
+        const seed = recordToItem(r);
+        m.set(r.id, cur ? { ...cur, ...seed } : seed);
+        return new Map(m);
+      });
+    },
+
     handleStarted(p: DownloadStarted) {
       const cur = get(items).get(p.id);
       const seed: DownloadItem = cur ?? {
