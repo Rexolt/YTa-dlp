@@ -18,7 +18,8 @@ export const Events = {
   Progress: 'download://progress',
   Log: 'download://log',
   Finished: 'download://finished',
-  QueueChanged: 'queue://changed'
+  QueueChanged: 'queue://changed',
+  Queued: 'queue://queued'
 } as const;
 
 export interface FormatInfo {
@@ -76,6 +77,7 @@ export interface EnvironmentReport {
   ytDlp: ToolStatus;
   ffmpeg: ToolStatus;
   ffprobe: ToolStatus;
+  ffmpegHasWebp: boolean;
 }
 
 export interface UpdateResult {
@@ -112,5 +114,7 @@ export const ipc = {
   onFinished: (cb: (p: DownloadFinished) => void): Promise<UnlistenFn> =>
     listen<DownloadFinished>(Events.Finished, (e) => cb(e.payload)),
   onQueueChanged: (cb: (p: QueueChanged) => void): Promise<UnlistenFn> =>
-    listen<QueueChanged>(Events.QueueChanged, (e) => cb(e.payload))
+    listen<QueueChanged>(Events.QueueChanged, (e) => cb(e.payload)),
+  onQueued: (cb: (p: DownloadRecord) => void): Promise<UnlistenFn> =>
+    listen<DownloadRecord>(Events.Queued, (e) => cb(e.payload))
 };

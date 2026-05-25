@@ -417,6 +417,8 @@ pub struct EnvironmentReport {
     pub yt_dlp: ToolStatus,
     pub ffmpeg: ToolStatus,
     pub ffprobe: ToolStatus,
+    /// Whether the resolved ffmpeg supports WebP decoding (false on Fedora's ffmpeg-free).
+    pub ffmpeg_has_webp: bool,
 }
 
 async fn probe_tool_version(
@@ -461,7 +463,8 @@ pub async fn check_environment() -> AppResult<EnvironmentReport> {
         status_for("ffmpeg", "-version"),
         status_for("ffprobe", "-version"),
     );
-    Ok(EnvironmentReport { yt_dlp, ffmpeg, ffprobe })
+    let ffmpeg_has_webp = bin::ffmpeg_has_webp();
+    Ok(EnvironmentReport { yt_dlp, ffmpeg, ffprobe, ffmpeg_has_webp })
 }
 
 #[derive(Debug, Serialize)]

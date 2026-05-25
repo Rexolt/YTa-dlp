@@ -161,6 +161,17 @@
         {/each}
       </ul>
 
+      {#if report && report.ffmpeg.available && !report.ffmpegHasWebp}
+        <div transition:fade class="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+          <AlertTriangle class="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+          <div class="text-[11px] text-amber-300">
+            <strong>Limited ffmpeg:</strong> Your system ffmpeg cannot decode WebP images.
+            Thumbnail embedding will be automatically skipped.
+            To enable full features, install the complete ffmpeg package (e.g. RPM Fusion).
+          </div>
+        </div>
+      {/if}
+
       <div class="mt-5 flex flex-wrap items-center justify-between gap-2">
         <p class="text-[11px] text-muted-foreground">
           Run <code class="font-mono text-foreground">pnpm binaries:fetch</code> to install bundled sidecars,

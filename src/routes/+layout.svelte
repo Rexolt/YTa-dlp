@@ -16,10 +16,11 @@
     settings.syncToBackend(get(settings)).catch(() => { /* ignore */ });
 
     const offs: Promise<() => void>[] = [
+      ipc.onQueued((r) => downloads.handleQueued(r)),
       ipc.onStarted((p) => downloads.handleStarted(p)),
       ipc.onProgress((p) => downloads.handleProgress(p)),
       ipc.onFinished((p) => downloads.handleFinished(p)),
-      ipc.onQueueChanged(() => { /* could update a header indicator */ }),
+      ipc.onQueueChanged(() => { /* header indicator updates from store */ }),
       ipc.onLog(() => { /* attach log viewer later */ })
     ];
 

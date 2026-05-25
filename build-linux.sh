@@ -61,6 +61,51 @@ RPM_DIR="src-tauri/target/release/bundle/rpm"
 rm -rf "$ARCH_DIR"
 rm -rf "$RPM_DIR"
 
+# Rebuild the .deb without the bundled ffmpeg/yt-dlp/ffprobe so that the
+# package relies on the system-installed binaries (declared as Depends in
+# the Tauri config). Bundling them inside /usr/bin causes file conflicts
+# with the distro's `ffmpeg`/`yt-dlp` packages and pulls in a foreign
+# build that may not work on every Debian/Ubuntu derivative.
+ORIGINAL_DEB=$(find "$DEB_DIR" -maxdepth 2 -name "*.deb" | head -n 1 || true)
+if [ -n "$ORIGINAL_DEB" ]; then
+    echo -e "\n${CYAN}Stripping bundled ffmpeg/yt-dlp from .deb (rely on system packages)...${NC}"
+    DEB_REPACK=$(mktemp -d)
+    cp "$ORIGINAL_DEB" "$DEB_REPACK/orig.deb"
+    (
+        cd "$DEB_REPACK"
+        ar x orig.deb
+        mkdir -p extracted
+        DATA_TAR=$(ls data.tar.* | head -n 1)
+        tar -xf "$DATA_TAR" -C extracted/
+        # Drop bundled sidecars — these conflict with the distro's own packages.
+        rm -f extracted/usr/bin/ffmpeg \
+              extracted/usr/bin/ffprobe \
+              extracted/usr/bin/yt-dlp
+        # Recompress data.tar in the same compression format as the original.
+        case "$DATA_TAR" in
+            *.zst) tar --zstd -C extracted -cf data.tar.zst . ;;
+            *.xz)  tar -C extracted -cJf data.tar.xz . ;;
+            *.gz)  tar -C extracted -czf data.tar.gz . ;;
+            *)     tar -C extracted -cf data.tar . ;;
+        esac
+        # Repack: must preserve ar member order: debian-binary, control.tar.*, data.tar.*.
+        CONTROL_TAR=$(ls control.tar.* | head -n 1)
+        NEW_DATA=$(ls data.tar.* | grep -v "^$DATA_TAR$" | head -n 1 || echo "$DATA_TAR")
+        ar rc repacked.deb debian-binary "$CONTROL_TAR" "$NEW_DATA"
+    )
+    if [ -f "$DEB_REPACK/repacked.deb" ]; then
+        cp "$DEB_REPACK/repacked.deb" "$ORIGINAL_DEB"
+        echo -e "${GREEN}✓ .deb repacked without bundled ffmpeg/yt-dlp${NC}"
+    else
+        echo -e "${YELLOW}⚠ Failed to repack .deb without sidecars — keeping original${NC}"
+    fi
+    rm -rf "$DEB_REPACK"
+
+    # Also strip bundled sidecars from the AppImage's `appimage_deb` source tree
+    # is NOT needed: AppImage runs from a private mountpoint, so the sidecars
+    # there don't conflict with the host system.
+fi
+
 DEB_FILE=$(find "$DEB_DIR" -name "*.deb" | head -n 1 || true)
 if [ -n "$DEB_FILE" ]; then
     echo -e "\n${CYAN}Building Arch Linux Pacman package (.pkg.tar.zst) from .deb...${NC}"

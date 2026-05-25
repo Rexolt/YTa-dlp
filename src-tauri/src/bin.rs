@@ -132,6 +132,46 @@ pub fn ffmpeg_location() -> Option<PathBuf> {
     f.path.parent().map(|p| p.to_path_buf())
 }
 
+/// Returns `true` if the resolved ffmpeg can decode WebP images.
+/// Fedora's `ffmpeg-free` strips this codec, causing `--embed-thumbnail`
+/// to fail with "Error opening output files: Invalid argument" when
+/// YouTube sends thumbnails in `.webp` format.
+///
+/// Result is cached for the process lifetime.
+static FFMPEG_HAS_WEBP: Lazy<bool> = Lazy::new(|| {
+    let f = resolve("ffmpeg");
+    if !f.is_present() {
+        return false;
+    }
+    // `ffmpeg -decoders` lists supported decoders; grep for "webp".
+    let out = std::process::Command::new(&f.path)
+        .args(["-decoders", "-hide_banner"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output();
+    match out {
+        Ok(o) => {
+            let text = String::from_utf8_lossy(&o.stdout);
+            let has = text.lines().any(|l| {
+                // Decoder lines look like: " V..... webp ..."
+                let trimmed = l.trim();
+                trimmed.contains("webp") && (trimmed.starts_with('V') || trimmed.contains("V"))
+            });
+            tracing::info!(ffmpeg = %f.path.display(), webp_support = has, "probed ffmpeg WebP capability");
+            has
+        }
+        Err(e) => {
+            tracing::warn!(error = ?e, "failed to probe ffmpeg decoders");
+            false
+        }
+    }
+});
+
+pub fn ffmpeg_has_webp() -> bool {
+    *FFMPEG_HAS_WEBP
+}
+
 #[allow(dead_code)]
 pub fn path_for(name: &'static str) -> PathBuf {
     resolve(name).path

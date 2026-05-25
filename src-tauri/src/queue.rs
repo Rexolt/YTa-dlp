@@ -19,6 +19,9 @@ const BASE_BACKOFF_MS: u64 = 1500;
 
 /// Events emitted by the queue layer (separate from per-download events).
 pub const EVT_QUEUE_CHANGED: &str = "queue://changed";
+/// Fired immediately after a download is enqueued so the UI can render a
+/// "queued" card without waiting for the dispatcher to pick it up.
+pub const EVT_QUEUED: &str = "queue://queued";
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +71,11 @@ impl QueueManager {
             .db
             .insert_queued(&id, &options.url, &options, pos)
             .await?;
+        // Emit a snapshot of the freshly created record so the UI can show
+        // the queued card immediately, without waiting for the dispatcher.
+        if let Ok(Some(rec)) = self.inner.db.get(&id).await {
+            let _ = self.inner.app.emit(EVT_QUEUED, rec);
+        }
         self.notify_changed().await;
         self.inner.notify.notify_one();
         Ok(id)
@@ -247,6 +255,10 @@ impl QueueManager {
 
             match res {
                 Ok(RunOutcome::Success) => break Ok(()),
+                Ok(RunOutcome::PartialSuccess { warning }) => {
+                    tracing::warn!(id=%rec.id, %warning, "download partial success — will not retry");
+                    break Ok(());
+                }
                 Ok(RunOutcome::Canceled) => break Err(AppError::Other("canceled".into())),
                 Ok(RunOutcome::Failed { code, stderr_tail: _ })
                 | Err(AppError::NonZeroExit(code))
