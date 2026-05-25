@@ -48,7 +48,7 @@ jobs:
 
       - name: Build Tauri and create GitHub Release
         id: tauri-build
-        uses: tauri-apps/tauri-action@v2
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -57,6 +57,7 @@ jobs:
           releaseBody: 'Premium downloader powered by yt-dlp. Select the package that fits your Linux distribution.'
           releaseDraft: false
           prerelease: false
+          args: --bundles deb,appimage
 
       - name: Strip bundled ffmpeg/yt-dlp from .deb (rely on system packages)
         run: |
